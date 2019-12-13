@@ -47,7 +47,7 @@ memset(history[0].cmd, 0, MAXLINE);
 if (strlen(cmd) > MAXLINE) {
   strncpy(history[0].cmd, cmd, MAXLINE - 1);
 } else {
-  strncpy(history[0].cmd, cmd, strlen(cmd) -1);
+  strncpy(history[0].cmd, cmd, strlen(cmd));
 }
 
 

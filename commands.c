@@ -12,78 +12,95 @@
 #include <errno.h>
 #include "smash.h"
 #include "history.h"
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-int executeCommand(char *str) {
-int argCounter = 0;
-char buff[MAXLINE];
-char *args[100];
+/*******************/
+// EXECUTE COMMAND //
+/*******************/
 
-for (int i = 0; i < 100; i++) { // Clear pointers
-args[i] == NULL;
-}
-
-memset(buff, 0, MAXLINE-1); // Clear previous buff
-
-
-if (strlen(str) == 1) {
-return 3;
-} else if (strlen(str) >= MAXLINE) {
-  strncpy(buff, str, MAXLINE - 1);
-
-} else {
-  strncpy(buff, str, strlen(str));
-}
-
-// Grab token
-char *token = strtok(buff, " ");
-args[0] = token;
-
+int executeCommand(char *args[], int argCounter) {
+int status = 0;
 if (args[0] == NULL) {
-return 3;
-}
-
-/* Grab additional tokens */
-while (token != NULL && argCounter < 100) {
-  argCounter++;
-  token = strtok(NULL, " ");
-  args[argCounter] = token;  
+return -3;
 }
 
 // check for Exit value
-if (strcmp(args[0], "exit\n") == 0 || (strcmp(args[0], "exit") == 0)) {
-return 50; //gives return value of 50. Smash.c recognizes exitStatus 50 as code to unmalloc memory and exit cleanly. 
+for (int i = 0; i < argCounter; i++) {
+  if (strcmp(args[i], "exit") == 0 || strcmp(args[i], "exit\n") == 0) {
+  return -50; //gives return value of 50.
 }
-
-// Return 0 for CD
-else if (argCounter == 1 && ((strcmp(args[0], "cd\n") == 0 || (strcmp(args[0], "cd") == 0)))) {
-return 0; //gives return 
 }
 
 // Return History
-else if (argCounter == 1 && ((strcmp(args[0], "history\n") == 0 || (strcmp(args[0], "history") == 0)))) {
-return 11; //gives return to skip adding history since it's been added
+if (argCounter == 1 && (strcmp(args[0], "history") == 0)) {
+return -11; //gives return to skip adding history since it's been added
 }
-
 
 // check for CD arg Value
-else if (argCounter == 2 && ((strcmp(args[0], "cd\n") == 0 || (strcmp(args[0], "cd") == 0)))) {
+else if (argCounter == 2 && ((strcmp(args[0], "cd") == 0))) {
   int chdirStatus = (chdir(args[1]));
   if (chdirStatus != 0) {
-  perror(args[1]); 
-  return 1;
+  perror(args[1]);
+  return -1;
   } else {
-  return 0; 
+  return 0;
 }
-// ignore if nothing is passed through
 
-
-// print [] of external commands
+// return for exec command
 } else {
-for (int i = 0; i < argCounter-1; i++) {
-printf("[%d] %s\n", i, args[i]);
+ status = executeExternalCommand(args);
 }
-printf("[%d] %s", argCounter-1, args[argCounter-1]);
+return status;
+}
 
-return 127; 
+/****************************/
+// EXECUTE EXTERNAL COMMAND //
+/****************************/
+int executeExternalCommand(char *args[]) {
+
+  int result = 0;
+  pid_t child1 = fork();
+
+// check if fork failed
+if (child1 < 0) {
+  perror("Problem with forking.");
+  exit(-25);
 }
+//child reads this
+if (child1 == 0) {
+signal(SIGINT, sigintCatchInExternal);
+int invalidCommand = execvp(args[0], args);
+args = '\0';
+if (invalidCommand == -1) {
+  fputs("Command not found.\n", stderr);
+  fflush(stderr);
+  exit(127);
+}
+exit(invalidCommand);
+}
+
+// For parent process
+child1 = wait(&result);
+if (WIFEXITED(result)) {
+    int exitStatus = WEXITSTATUS(result);
+    if (exitStatus == 255) {
+      return -1;
+    }
+      return exitStatus;
+    } else {
+      printf("\n");
+      return -1;
+    }
+}
+
+/****************************************/
+//     CTRL + C Handling for External   //
+/****************************************/
+void sigintCatchInExternal(int sigIntNum) {
+  printf("\n");
+
 }

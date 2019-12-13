@@ -20,22 +20,28 @@
 # --------- Define options passed by make to compiler
       CFLAGS = -std=c99 -Wall
 
-# # --------- Compiler being used
-all: rules.d $(EXE)
+%.o : %.c
+	gcc $(CFLAGS) -c -o $@ $<
+
+
+all: smash
+
+smash: smash.o smashlib.a
+	gcc -o $@ $^
+
+debug: CFLAGS += -DDEBUG -g -Og
+debug: smash
 
 rules.d: Makefile $(wildcard *.c) $(wildcard *.h)
 	gcc -MM $(wildcard *.c) >rules.d
 
-# --------- rule for linking the executable product
-
 -include rules.d
 
-# --------- Define target "all" for building the executables
-all: $(EXE)
+smashlib.a: history.o commands.o
+					ar r $@ $^
 
-$(EXE): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@
-
+valgrind: debug
+	valgrind --leak-check=yes --leak-check=full --show-leak-kinds=all ./smash
 # --------- Rule for cleaning build and emacs artifacts
       clean:
-				rm -f smash ./*.o ./*.stackdump EXE
+				rm -f smash ./*.o ./*.stackdump EXE ./*.md ./*.a ./*.out ./*.txt ./*.csv
